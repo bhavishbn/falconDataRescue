@@ -25,7 +25,7 @@ class Settings(BaseSettings):
     app_env: str = "development"
     debug: bool = False
     secret_key: str = ""
-    cors_origins: str = "http://127.0.0.1:8010,http://localhost:8010"
+    cors_origins: str = "http://127.0.0.1:8010,http://localhost:8010,http://127.0.0.1:5500,http://localhost:5500"
 
     # ── Database ─────────────────────────────────────────────────────────
     # SQLite keeps a fresh checkout runnable without requiring a local

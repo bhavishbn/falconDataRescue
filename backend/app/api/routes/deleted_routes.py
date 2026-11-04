@@ -18,7 +18,12 @@ class ScanDriveRequest(BaseModel):
 
 @router.get("/drives")
 async def list_drives():
-    return {"status": "success", "drives": ndr.list_drives()}
+    try:
+        return {"status": "success", "drives": ndr.list_drives()}
+    except PermissionError as exc:
+        raise HTTPException(status_code=403, detail="Drive enumeration requires Administrator access. Start the server with start_server.bat.") from exc
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=f"Unable to enumerate Windows drives: {exc}") from exc
 
 
 @router.post("/scan-drive")
@@ -27,7 +32,11 @@ async def scan_drive(req: ScanDriveRequest):
     if not letter.isalpha():
         raise HTTPException(status_code=400, detail="Invalid drive letter")
     try:
-        return ndr.scan_drive_for_deleted(letter, max_items=min(req.max_items, 500))
+        result = ndr.scan_drive_for_deleted(letter, max_items=min(req.max_items, 500))
+        # The recovery bytes are already held server-side in DELETED_STORE for
+        # the download endpoints. Never send raw bytes through JSON.
+        result.pop("raw_items_map", None)
+        return result
     except PermissionError as exc:
         raise HTTPException(status_code=403, detail=str(exc))
     except ValueError as exc:

@@ -8,7 +8,7 @@ if %errorlevel% neq 0 (
 )
 
 title FalconDataRescue Recovery Server (Administrator)
-cd /d c:\MCE\backend
+cd /d "%~dp0backend"
 echo Backend server starting at http://127.0.0.1:8010  [Administrator]
 echo Open that address to use the recovery UI.
 echo Deleted-file drive scans now have raw disk access.

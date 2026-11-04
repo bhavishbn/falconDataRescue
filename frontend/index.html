@@ -232,6 +232,25 @@
       </div>
     </section>
 
+    <!-- The recovery contract: every action follows evidence analysis. -->
+    <section class="workflow-rail" aria-label="Recovery workflow">
+      <div class="workflow-step is-active" data-workflow-step="1">
+        <span class="workflow-number">01</span>
+        <div><strong>Analyze source</strong><small>Read-only scan of files and metadata</small></div>
+      </div>
+      <span class="workflow-connector" aria-hidden="true"></span>
+      <div class="workflow-step" data-workflow-step="2">
+        <span class="workflow-number">02</span>
+        <div><strong>Review fragments</strong><small>See damage, evidence, and confidence</small></div>
+      </div>
+      <span class="workflow-connector" aria-hidden="true"></span>
+      <div class="workflow-step" data-workflow-step="3">
+        <span class="workflow-number">03</span>
+        <div><strong>Recover validated data</strong><small>Reconstruct only what can be proven</small></div>
+      </div>
+      <div class="workflow-status" id="workflow-status">Waiting for a source file</div>
+    </section>
+
     <!-- Upload Dropzone (Files or Entire Folders) -->
     <section class="dropzone-container" id="dropzone">
       <input type="file" id="file-input" multiple style="display: none;">
@@ -290,8 +309,8 @@
       <div class="card-body">
         <div class="file-list" id="drive-scan-list">
           <div style="padding: 20px; text-align: center; color: var(--text-muted);">
-            Scans the drive's NTFS metadata ($MFT) for files deleted outside the Recycle Bin and reassembles
-            their data clusters — no Recycle Bin involved. Requires the server to run as Administrator.
+            Start the recovery server with Administrator access before scanning a live NTFS drive. In a terminal opened
+            at the project folder, run: <code class="terminal-command">.\start_server.bat</code>
           </div>
         </div>
         <div class="action-banner" id="drive-scan-banner" style="display: none;">
@@ -330,11 +349,11 @@
           <!-- Bottom Action Banner -->
           <div class="action-banner">
             <div>
-              <div style="font-weight: 600; font-size: 14px; margin-bottom: 2px;">Ready for Deep Fragment Reconstruction
+              <div style="font-weight: 600; font-size: 14px; margin-bottom: 2px;">Analysis complete — review before recovery
               </div>
               <div style="font-size: 12px; color: var(--text-muted);">
-                Pre-analysis has identified fragments, relationships, format issues, and integrity evidence. Recovery
-                will now reconstruct only what can be validated.
+                Fragments, relationships, format issues, and integrity evidence are ready. Recovery stays locked until
+                this evidence review is complete.
               </div>
             </div>
 
@@ -342,7 +361,7 @@
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                 <polyline points="20 6 9 17 4 12" />
               </svg>
-              Start Recovery Job
+              Recover Validated Data
             </button>
           </div>
         </div>
@@ -480,7 +499,7 @@
 
   <!-- Set this to the public FastAPI URL for a Netlify deployment. -->
   <script>window.FALCON_API_BASE_URL = window.FALCON_API_BASE_URL || '';</script>
-  <script src="app.js?v=ad3f2a0"></script>
+  <script src="app.js?v=recovery-download-fix"></script>
 </body>
 
 </html>

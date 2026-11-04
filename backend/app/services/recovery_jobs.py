@@ -165,13 +165,33 @@ async def _process(job_id: str) -> None:
             if item["id"] is not None:
                 candidate = REPAIRED_STORE[item["id"]][1]
             if item["report"].get("format") in {"jpeg", "jpg", "png"}:
-                ai_review = await asyncio.to_thread(
-                    analyze_image_recovery,
-                    item["file_name"],
-                    source,
-                    candidate,
-                    item["report"],
-                )
+                try:
+                    ai_review = await asyncio.wait_for(
+                        asyncio.to_thread(
+                            analyze_image_recovery,
+                            item["file_name"],
+                            source,
+                            candidate,
+                            item["report"],
+                        ),
+                        timeout=5,
+                    )
+                except asyncio.TimeoutError:
+                    ai_review = {
+                        "status": "timed_out",
+                        "provider": "local-evidence-ai",
+                        "role": "ranking_and_validation_only",
+                        "reason": "visual_review_timeout",
+                        "assessment": "Deterministic recovery completed; visual AI review timed out.",
+                    }
+                except Exception as exc:
+                    ai_review = {
+                        "status": "error",
+                        "provider": "local-evidence-ai",
+                        "role": "ranking_and_validation_only",
+                        "reason": str(exc),
+                        "assessment": "Deterministic recovery completed; visual AI review failed.",
+                    }
                 item["report"]["ai_review"] = ai_review
                 item["report"]["realism_assessment"] = ai_review.get("assessment")
             else:

@@ -19,7 +19,7 @@ const API_BASE_URL = configuredApiBase || (localHost && window.location.port !==
 
 let uploadedFiles = [];
 let analyzedItems = [];
-let backendAnalysisComplete = false;
+let recoveryReady = false;
 let currentInspectedIndex = 0;
 let currentMode = 'files';
 
@@ -29,7 +29,28 @@ document.addEventListener('DOMContentLoaded', () => {
   initRecoveryHandler();
   checkBackendHealth();
   initLandingNav();
+  updateWorkflow('idle');
 });
+
+function updateWorkflow(state) {
+  const steps = document.querySelectorAll('[data-workflow-step]');
+  const status = document.getElementById('workflow-status');
+  const active = state === 'idle' || state === 'analyzing' ? 1 : state === 'review' ? 2 : 3;
+  steps.forEach((step, index) => {
+    const number = index + 1;
+    step.classList.toggle('is-active', number === active);
+    step.classList.toggle('is-complete', number < active || state === 'complete');
+  });
+  if (status) {
+    status.textContent = {
+      idle: 'Waiting for a source file',
+      analyzing: 'Analyzing source • recovery is locked',
+      review: 'Analysis ready • inspect fragments before recovery',
+      recovering: 'Recovering validated data • preserving source evidence',
+      complete: 'Recovery complete • validated results are available below'
+    }[state] || '';
+  }
+}
 
 function initLandingNav() {
   document.querySelectorAll('a[href^="#"]').forEach((link) => {
@@ -230,7 +251,9 @@ function initFileInputs() {
 function clearUploadQueue() {
   uploadedFiles = [];
   analyzedItems = [];
-  backendAnalysisComplete = false;
+  recoveryReady = false;
+  const recoveryButton = document.getElementById('btn-start-repair');
+  if (recoveryButton) recoveryButton.disabled = false;
   document.getElementById('workspace-section').style.display = 'none';
   document.getElementById('restored-section').style.display = 'none';
   showToast('Cleared workspace queue.', 'info');
@@ -370,12 +393,15 @@ async function handleFilesIngested(files) {
   }
 
   uploadedFiles = selectedFiles;
+  const recoveryButton = document.getElementById('btn-start-repair');
+  if (recoveryButton) recoveryButton.disabled = true;
+  updateWorkflow('analyzing');
   document.getElementById('workspace-section').style.display = 'block';
   document.getElementById('total-files-count').textContent = selectedFiles.length;
   document.getElementById('restored-section').style.display = 'none';
 
   analyzedItems = [];
-  backendAnalysisComplete = false;
+  recoveryReady = false;
   for (let i = 0; i < selectedFiles.length; i++) {
     const file = selectedFiles[i];
     const buffer = await file.arrayBuffer();
@@ -432,12 +458,13 @@ async function enrichWithBackendDiagnosis(files) {
     const data = await response.json();
     attachDiagnoses(data.items);
     renderDiagnosticsList();
-    backendAnalysisComplete = data.items?.length === files.length;
-    if (backendAnalysisComplete) {
-      if (recoveryButton) recoveryButton.disabled = false;
+    recoveryReady = true;
+    if (recoveryButton) recoveryButton.disabled = false;
+    updateWorkflow('review');
+    if (data.items?.length === files.length) {
       showToast('Pre-recovery evidence analysis complete. Review fragments before starting recovery.', 'success');
     } else {
-      showToast(`Backend analyzed ${data.items?.length || 0}/${files.length} file(s); recovery is waiting for complete analysis.`, 'warning');
+      showToast(`Backend analyzed ${data.items?.length || 0}/${files.length} file(s). Recovery can continue using local analysis for the rest.`, 'warning');
     }
   } catch (error) {
     // A single large or unusual file should not hide diagnosis for every other file.
@@ -459,14 +486,14 @@ async function enrichWithBackendDiagnosis(files) {
     if (individualDiagnoses.length > 0) {
       attachDiagnoses(individualDiagnoses);
       renderDiagnosticsList();
-      backendAnalysisComplete = individualDiagnoses.length === files.length;
-      if (backendAnalysisComplete && recoveryButton) recoveryButton.disabled = false;
-      showToast(`Evidence analysis completed for ${individualDiagnoses.length}/${files.length} file(s).${backendAnalysisComplete ? '' : ' Recovery is waiting for the remaining analysis.'}`, 'warning');
+      showToast(`Backend evidence analysis completed for ${individualDiagnoses.length}/${files.length} file(s). Recovery can continue using local analysis for the rest.`, 'warning');
     } else {
-      backendAnalysisComplete = false;
       console.warn('Backend pre-analysis unavailable; showing local analysis only.', error);
-      showToast('Backend pre-analysis unavailable; per-file local evidence analysis is shown.', 'warning');
+      showToast('Backend pre-analysis unavailable; local analysis is ready and recovery can still be attempted.', 'warning');
     }
+    recoveryReady = true;
+    if (recoveryButton) recoveryButton.disabled = false;
+    updateWorkflow('review');
   }
 }
 
@@ -737,7 +764,10 @@ async function loadDriveList() {
   sel.innerHTML = '<option value="">Detecting drives...</option>';
   try {
     const res = await fetch(`${API_BASE_URL}/api/deleted/drives`);
-    if (!res.ok) throw new Error(`Drive enumeration failed (${res.status})`);
+    if (!res.ok) {
+      const errorBody = await res.json().catch(() => ({}));
+      throw new Error(errorBody.detail || `Drive enumeration failed (${res.status})`);
+    }
     const data = await res.json();
     const drives = data.drives || [];
     sel.innerHTML = drives.length
@@ -752,7 +782,22 @@ async function loadDriveList() {
     }
   } catch (e) {
     console.error(e);
-    sel.innerHTML = '<option value="">Unable to enumerate drives</option>';
+    const message = e.message === 'Failed to fetch'
+      ? 'Recovery server is offline'
+      : e.message || 'Unable to enumerate drives';
+    sel.innerHTML = `<option value="">${escapeHtml(message)}</option>`;
+    const list = document.getElementById('drive-scan-list');
+    if (list) {
+      list.innerHTML = `
+        <div class="drive-error-state">
+          <strong>Unable to enumerate drives</strong>
+          <p>${escapeHtml(message)}. Run this from an Administrator terminal:</p>
+          <div class="drive-command-row">
+            <code class="terminal-command">C:\\MCE\\start_server.bat</code>
+            <button class="btn btn-secondary btn-sm" onclick="loadDriveList()">Retry drive detection</button>
+          </div>
+        </div>`;
+    }
   }
 }
 
@@ -872,13 +917,14 @@ function initRecoveryHandler() {
       showToast('Please upload corrupted files first.', 'warning');
       return;
     }
-    if (!backendAnalysisComplete) {
-      showToast('Complete backend pre-analysis before starting recovery.', 'warning');
+    if (!recoveryReady) {
+      showToast('Wait for file analysis to finish before starting recovery.', 'warning');
       return;
     }
 
     btn.disabled = true;
     btn.innerHTML = `<span style="display:inline-block; animation:spin 1s linear infinite;">⏳</span> Carving Fragments & Reconstructing Objects...`;
+    updateWorkflow('recovering');
     showToast('Scanning image bytes and validating recoverable ranges...', 'info');
 
     // Queue backend recovery and poll until deterministic validation + AI review finish.
@@ -923,6 +969,8 @@ function initRecoveryHandler() {
       btn.innerHTML = 'Start Recovery Job';
       return;
     }
+
+    updateWorkflow('complete');
 
     btn.disabled = false;
     btn.innerHTML = repairedCount
@@ -1011,11 +1059,16 @@ function padOffset(offset) {
 }
 
 async function waitForRecoveryJob(jobId) {
+  let renderedItemCount = 0;
   while (true) {
     const res = await fetch(`${API_BASE_URL}/api/repair/jobs/${jobId}`);
     if (!res.ok) throw new Error(`Recovery status request failed (${res.status})`);
     const job = await res.json();
     showToast(`${job.status.replace('_', ' ')} • ${job.progress}%`, 'info');
+    if (job.items?.length > renderedItemCount) {
+      renderedItemCount = job.items.length;
+      renderRestoredResults(job.items, true, job.bundle_id);
+    }
     if (['completed', 'failed'].includes(job.status)) return job;
     await new Promise(resolve => setTimeout(resolve, 1000));
   }

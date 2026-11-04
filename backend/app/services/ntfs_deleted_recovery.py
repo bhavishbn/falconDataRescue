@@ -77,6 +77,36 @@ def _decode_runs(data: bytes, off: int) -> list[tuple[int | None, int]]:
     return runs
 
 
+def _apply_ntfs_fixup(record: bytes, bytes_per_sector: int) -> bytes:
+    """Restore sector-tail bytes replaced by NTFS's update-sequence array.
+
+    Every on-disk FILE record carries a USA at 0x04. NTFS replaces the last
+    two bytes of each sector with a sequence number and stores the original
+    bytes in the USA. Parsing without restoring them can truncate attributes
+    or corrupt a non-resident $DATA run-list on real volumes.
+    """
+    if len(record) < 8 or bytes_per_sector <= 0:
+        return record
+    usa_offset = _u16(record, 0x04)
+    usa_count = _u16(record, 0x06)
+    if usa_count < 2 or usa_offset + usa_count * 2 > len(record):
+        return record
+    sector_count = (len(record) + bytes_per_sector - 1) // bytes_per_sector
+    if usa_count != sector_count:
+        return record
+    sequence = record[usa_offset:usa_offset + 2]
+    fixed = bytearray(record)
+    for index in range(1, usa_count):
+        tail = index * bytes_per_sector - 2
+        if tail < 0 or tail + 2 > len(fixed):
+            return record
+        if bytes(fixed[tail:tail + 2]) != sequence:
+            return record
+        replacement = usa_offset + index * 2
+        fixed[tail:tail + 2] = record[replacement:replacement + 2]
+    return bytes(fixed)
+
+
 class Volume:
     """Raw reader over a logical volume (file handle or in-memory bytes)."""
 
@@ -117,6 +147,7 @@ class Volume:
         code = struct.unpack_from("<b", bs, 0x40)[0]
         record_size = code * cluster_size if code > 0 else 1 << (-code)
         return {
+            "bytes_per_sector": bytes_per_sector,
             "cluster_size": cluster_size,
             "mft_offset": mft_lcn * cluster_size,
             "record_size": record_size,
@@ -233,6 +264,7 @@ def _scan_volume(volume: Volume, max_items: int, source_label: str) -> dict:
     geo = volume.parse_geometry()
     cluster = geo["cluster_size"]
     mft_record = volume.read_at(geo["mft_offset"], geo["record_size"])
+    mft_record = _apply_ntfs_fixup(mft_record, geo["bytes_per_sector"])
     mft_info = _parse_record(mft_record)
     if not mft_info or not mft_info["runs"]:
         raise ValueError("Could not locate the $MFT data runs on this volume")
@@ -257,6 +289,7 @@ def _scan_volume(volume: Volume, max_items: int, source_label: str) -> dict:
         scanned += 1
         try:
             rec = mft.read_windowed(i * record_size, record_size)
+            rec = _apply_ntfs_fixup(rec, geo["bytes_per_sector"])
             info = _parse_record(rec)
         except (OSError, ValueError, struct.error):
             continue
