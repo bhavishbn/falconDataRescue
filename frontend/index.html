@@ -7,7 +7,7 @@
   <title>FalconDataRescue AI Data Recovery & Forensic Reconstruction Studio</title>
   <meta name="description"
     content="AI-assisted data recovery platform to identify, reconstruct, classify, and prioritize recoverable digital information from damaged, deleted, or partially corrupted storage data.">
-  <link rel="stylesheet" href="styles.css">
+  <link rel="stylesheet" href="styles.css?v=workspace-navigation">
   <link rel="icon"
     href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%2300f2fe'><path d='M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5'/></svg>">
 </head>
@@ -16,17 +16,54 @@
 
   <!-- Public landing screen. The forensic workspace opens after Recover Now. -->
   <section class="landing-page" id="landing-page">
-    <div class="reference-landing" aria-label="FalconDataRescue Recover landing page">
-      <div class="reference-landing-wrapper">
-        <img src="accets/landing-green.jpeg" alt="Recover files from corrupted data" class="reference-landing-image">
-        <nav class="reference-nav-overlay" aria-label="Landing navigation">
-          <a href="#landing-page" data-nav="home">Home</a>
-          <a href="#lp-about" data-nav="about">About</a>
-          <a href="#lp-features" data-nav="features">Features</a>
-          <a href="#lp-contact" data-nav="contact">Contact</a>
-        </nav>
-        <button class="reference-recover-overlay" onclick="openRecoveryWorkspace()" aria-label="Recover Now">Recover Now
-          <span>→</span></button>
+    <nav class="landing-nav" aria-label="Main navigation">
+      <a class="landing-brand" href="#landing-page">
+        <span class="landing-brand-icon">⟳</span>
+        <span>FalconDataRescue</span>
+      </a>
+      <div class="landing-links">
+        <a href="#landing-page">Home</a>
+        <a href="#lp-about">About</a>
+        <a href="#lp-features">Features</a>
+        <a href="#lp-contact">Contact</a>
+      </div>
+      <button class="landing-nav-cta" onclick="openRecoveryWorkspace()">Open Recovery <span>→</span></button>
+    </nav>
+
+    <div class="landing-hero">
+      <div class="landing-copy">
+        <div class="landing-kicker">SMART FILE RECOVERY</div>
+        <h2>From Damaged<br>to <span>Validated</span></h2>
+        <p>Don’t lose your important files.<br>Analyze, recover, and validate your data—all in one place.</p>
+        <button class="landing-cta" onclick="openRecoveryWorkspace()">
+          Recover Now <span>→</span>
+        </button>
+        <div class="landing-features">
+          <div><span>◇</span><strong>Safe &amp; Secure</strong></div>
+          <div><span>ϟ</span><strong>Evidence Based</strong></div>
+          <div><span>▣</span><strong>All File Types</strong></div>
+          <div><span>▤</span><strong>Fragment Analysis</strong></div>
+        </div>
+      </div>
+      <div class="landing-art" aria-label="Damaged files becoming a validated folder">
+        <div class="art-file-chip art-pdf">PDF</div>
+        <div class="art-file-chip art-doc">▤</div>
+        <div class="art-file-chip art-xls">X</div>
+        <div class="art-file-chip art-img">▧</div>
+        <div class="art-file-chip art-code">&lt;/&gt;</div>
+        <div class="art-file-chip art-zip">♫</div>
+        <div class="art-broken-file">
+          <div class="art-page-fold"></div>
+          <span class="art-eye left"></span><span class="art-eye right"></span>
+          <span class="art-mouth">⌁</span>
+        </div>
+        <div class="art-arrow">➜</div>
+        <div class="art-folder">
+          <div class="art-folder-tab"></div>
+          <div class="art-folder-face"><span>⌣</span><b>•</b><i>⌣</i></div>
+        </div>
+        <div class="art-spark spark-one">✦</div>
+        <div class="art-spark spark-two">✧</div>
       </div>
     </div>
 
@@ -102,62 +139,6 @@
       </div>
     </section>
 
-    <footer class="lp-footer">
-          FalconDataRescue Forensic Recovery · Analyze first · Recover only what can be validated
-    </footer>
-
-    <nav class="landing-nav" aria-label="Landing navigation">
-      <a class="landing-brand" href="#landing-page">
-        <span class="landing-brand-icon">⟳</span>
-        <span>Recover</span>
-      </a>
-      <div class="landing-links">
-        <a class="active" href="#landing-page">Home</a>
-        <a href="#landing-features">About</a>
-        <a href="#landing-features">Features</a>
-        <a href="#landing-footer">Contact</a>
-      </div>
-    </nav>
-
-    <div class="landing-hero">
-      <div class="landing-copy">
-        <div class="landing-kicker">SMART FILE RECOVERY</div>
-        <h2>From Damaged<br>to <span>Validated</span></h2>
-        <p>Don’t lose your important files.<br>Analyze, recover, and validate your data—all in one place.</p>
-        <button class="landing-cta" onclick="openRecoveryWorkspace()">
-          Recover Now <span>→</span>
-        </button>
-
-        <div class="landing-features" id="landing-features">
-          <div><span>◇</span><strong>Safe &amp; Secure</strong></div>
-          <div><span>ϟ</span><strong>Evidence Based</strong></div>
-          <div><span>▣</span><strong>All File Types</strong></div>
-          <div><span>▤</span><strong>Fragment Analysis</strong></div>
-        </div>
-      </div>
-
-      <div class="landing-art" aria-label="Damaged files becoming a validated folder">
-        <div class="art-file-chip art-pdf">PDF</div>
-        <div class="art-file-chip art-doc">▤</div>
-        <div class="art-file-chip art-xls">X</div>
-        <div class="art-file-chip art-img">▧</div>
-        <div class="art-file-chip art-code">&lt;/&gt;</div>
-        <div class="art-file-chip art-zip">♫</div>
-        <div class="art-broken-file">
-          <div class="art-page-fold"></div>
-          <span class="art-eye left"></span><span class="art-eye right"></span>
-          <span class="art-mouth">⌁</span>
-        </div>
-        <div class="art-arrow">➜</div>
-        <div class="art-folder">
-          <div class="art-folder-tab"></div>
-          <div class="art-folder-face"><span>⌣</span><b>•</b><i>⌣</i></div>
-        </div>
-        <div class="art-spark spark-one">✦</div>
-        <div class="art-spark spark-two">✧</div>
-      </div>
-    </div>
-
     <footer class="landing-footer" id="landing-footer">
       FalconDataRescue Forensic Recovery · Analyze first · Recover only what can be validated
     </footer>
@@ -187,7 +168,7 @@
           <path d="M3 9.5 12 3l9 6.5" />
           <path d="M5 10v10h14V10" />
         </svg>
-        Home
+        Back to Home
       </button>
       <div class="status-indicator">
         <div class="status-dot"></div>
@@ -499,7 +480,7 @@
 
   <!-- Set this to the public FastAPI URL for a Netlify deployment. -->
   <script>window.FALCON_API_BASE_URL = window.FALCON_API_BASE_URL || '';</script>
-  <script src="app.js?v=recovery-download-fix"></script>
+  <script src="app.js?v=workspace-navigation"></script>
 </body>
 
 </html>

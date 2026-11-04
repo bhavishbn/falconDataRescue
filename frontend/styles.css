@@ -1223,6 +1223,23 @@ body.landing-active .landing-page {
 .landing-links a:hover,
 .landing-links a.active { color: #2f1712; border-bottom-color: #f36b20; }
 
+.landing-nav-cta {
+  border: 0;
+  border-radius: 24px;
+  padding: 12px 18px;
+  color: #fff;
+  background: linear-gradient(135deg, #ff641c, #f37b16);
+  font: 700 14px 'Inter', sans-serif;
+  white-space: nowrap;
+  cursor: pointer;
+  box-shadow: 0 8px 18px rgba(237, 93, 22, .2);
+}
+.landing-nav-cta span { padding-left: 5px; }
+.landing-nav-cta:hover { filter: brightness(1.06); }
+.landing-nav-cta:focus-visible,
+.landing-links a:focus-visible,
+.landing-brand:focus-visible { outline: 3px solid #357a41; outline-offset: 4px; }
+
 .landing-hero {
   width: min(1390px, calc(100% - 110px));
   min-height: calc(100vh - 142px);
@@ -1297,7 +1314,12 @@ body.landing-active .landing-page {
 }
 
 @media (max-width: 560px) {
-  .landing-nav { width: calc(100% - 28px); height: 72px; }.landing-brand { font-size: 23px; }.landing-brand-icon { width: 38px; height: 38px; font-size: 24px; }.landing-links a:nth-child(n+3) { display: none; }
+  .landing-nav { width: calc(100% - 28px); height: auto; min-height: 72px; padding: 12px 0; flex-wrap: wrap; gap: 8px; }
+  .landing-brand { font-size: 19px; gap: 8px; }
+  .landing-brand-icon { width: 34px; height: 34px; font-size: 22px; }
+  .landing-nav-cta { padding: 10px 12px; font-size: 12px; }
+  .landing-links { order: 3; width: 100%; justify-content: space-between; gap: 8px; }
+  .landing-links a { font-size: 12px; }
   .landing-copy h2 { font-size: 48px; }.landing-features div { padding: 0 10px; font-size: 11px; }.landing-features span { font-size: 20px; }.landing-art { margin-left: -80px; margin-right: -80px; transform: scale(.62); margin-bottom: -180px; }
 }
 .dropzone-container::after { display: none; }
@@ -1362,9 +1384,7 @@ body.landing-active .landing-page {
 body.landing-active .landing-page { background: #fcf6ea; }
 body.landing-active .landing-page::before,
 body.landing-active .landing-page::after { display: none; }
-body.landing-active .landing-nav,
-body.landing-active .landing-hero,
-body.landing-active .landing-footer { display: none; }
+body.landing-active .landing-nav { position: sticky; top: 0; background: rgba(252, 246, 234, .94); backdrop-filter: blur(12px); }
 .reference-landing { display: none; }
 body.landing-active .reference-landing {
   display: flex;
