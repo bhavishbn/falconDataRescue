@@ -16,10 +16,13 @@ const configuredApiBase = (window.FALCON_API_BASE_URL || '').replace(/\/$/, '');
 const API_BASE_URL = configuredApiBase || (localHost && window.location.port !== '8010'
   ? 'http://127.0.0.1:8010'
   : '');
+const RECOVERY_HISTORY_KEY = 'falconDataRescue.recoveryHistory.v1';
+const MAX_RECOVERY_HISTORY = 30;
 
 let uploadedFiles = [];
 let analyzedItems = [];
 let recoveryReady = false;
+let recoveryHistory = [];
 let currentInspectedIndex = 0;
 let currentMode = 'files';
 
@@ -30,6 +33,8 @@ document.addEventListener('DOMContentLoaded', () => {
   checkBackendHealth();
   initLandingNav();
   updateWorkflow('idle');
+  loadRecoveryHistory();
+  initRecoveryHistoryActions();
 });
 
 function updateWorkflow(state) {
@@ -71,6 +76,202 @@ function openRecoveryWorkspace() {
 function showLanding() {
   document.body.classList.add('landing-active');
   window.scrollTo({ top: 0, behavior: 'auto' });
+}
+
+function showRecoveryHistory() {
+  document.body.classList.remove('landing-active');
+  document.getElementById('recovery-history-section')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
+function loadRecoveryHistory() {
+  try {
+    const saved = window.localStorage.getItem(RECOVERY_HISTORY_KEY);
+    if (saved) {
+      const parsed = JSON.parse(saved);
+      if (!Array.isArray(parsed)) throw new Error('Stored recovery history is not a list');
+      recoveryHistory = parsed
+        .filter(run =>
+          run && typeof run.id === 'string' && typeof run.createdAt === 'string' && Array.isArray(run.items)
+        )
+        .slice(0, MAX_RECOVERY_HISTORY)
+        .map(run => ({
+          id: run.id,
+          createdAt: run.createdAt,
+          source: typeof run.source === 'string' ? run.source : 'recovery',
+          sourceName: typeof run.sourceName === 'string' ? run.sourceName : '',
+          bundleId: typeof run.bundleId === 'string' ? run.bundleId : null,
+          items: run.items.filter(item => item && typeof item.fileName === 'string').map(item => ({
+            id: typeof item.id === 'string' ? item.id : null,
+            fileName: item.fileName,
+            status: typeof item.status === 'string' ? item.status : 'RECOVERY RESULT',
+            confidence: Number(item.confidence) || 0,
+            downloadable: Boolean(item.downloadable && item.id),
+          })),
+        }));
+    }
+  } catch (error) {
+    console.error('Could not load recovery history from this browser.', error);
+    showToast('Saved recovery history could not be read from this browser.', 'error');
+  }
+  renderRecoveryHistory();
+}
+
+function initRecoveryHistoryActions() {
+  const historyList = document.getElementById('recovery-history-list');
+  const clearButton = document.getElementById('btn-clear-recovery-history');
+  if (historyList) {
+    historyList.addEventListener('click', event => {
+      const button = event.target.closest('button[data-history-download], button[data-history-bundle]');
+      if (!button) return;
+      const run = recoveryHistory.find(entry => entry.id === button.dataset.runId);
+      if (!run) {
+        showToast('This recovery history entry is no longer available.', 'error');
+        return;
+      }
+      if (button.dataset.historyBundle !== undefined) {
+        downloadHistoryArtifact(run, run.bundleId, true);
+      } else {
+        const item = run.items.find(entry => entry.id === button.dataset.itemId);
+        if (!item) {
+          showToast('This recovered file is no longer available in history.', 'error');
+          return;
+        }
+        downloadHistoryArtifact(run, item.id);
+      }
+    });
+  }
+  if (clearButton) {
+    clearButton.addEventListener('click', () => {
+      if (!window.confirm('Clear saved recovery history from this browser?')) return;
+      try {
+        window.localStorage.removeItem(RECOVERY_HISTORY_KEY);
+      } catch (error) {
+        console.error('Could not clear recovery history from this browser.', error);
+        showToast('Could not clear saved recovery history.', 'error');
+        return;
+      }
+      recoveryHistory = [];
+      renderRecoveryHistory();
+    });
+  }
+}
+
+function saveRecoveryHistory(items, source, bundleId = null, sourceName = '') {
+  if (!items?.length) return;
+  const historyItems = items.map(item => {
+    const report = item.report || {};
+    let itemId = item.id ? String(item.id) : null;
+    if (source === 'disk-image' && itemId?.startsWith('carved:')) itemId = itemId.slice('carved:'.length);
+    return {
+      id: itemId,
+      fileName: String(item.file_name || item.filename || 'Recovered file'),
+      status: String(report.status || item.status || 'RECOVERY RESULT'),
+      confidence: Number(report.confidence ?? report.integrity_score ?? item.confidence) || 0,
+      downloadable: Boolean(itemId && report.download_available !== false),
+    };
+  });
+  const run = {
+    id: crypto.randomUUID(),
+    createdAt: new Date().toISOString(),
+    source,
+    sourceName: String(sourceName || ''),
+    bundleId: bundleId ? String(bundleId) : null,
+    items: historyItems,
+  };
+  recoveryHistory = [run, ...recoveryHistory].slice(0, MAX_RECOVERY_HISTORY);
+  try {
+    window.localStorage.setItem(RECOVERY_HISTORY_KEY, JSON.stringify(recoveryHistory));
+  } catch (error) {
+    console.error('Could not save recovery history in this browser.', error);
+    showToast('Recovery finished, but browser storage could not save its history.', 'warning');
+  }
+  renderRecoveryHistory();
+}
+
+function renderRecoveryHistory() {
+  const list = document.getElementById('recovery-history-list');
+  const count = document.getElementById('recovery-history-count');
+  const clearButton = document.getElementById('btn-clear-recovery-history');
+  if (!list || !count || !clearButton) return;
+
+  const itemCount = recoveryHistory.reduce((total, run) => total + run.items.length, 0);
+  count.textContent = String(itemCount);
+  clearButton.disabled = recoveryHistory.length === 0;
+  if (recoveryHistory.length === 0) {
+    list.innerHTML = '<div class="history-empty">Completed recovery runs will appear here.</div>';
+    return;
+  }
+
+  const sourceNames = {
+    'file-repair': 'Corrupted file recovery',
+    'disk-image': 'Disk image carving',
+    'ntfs-drive': 'Deleted-file drive scan',
+  };
+  list.innerHTML = recoveryHistory.map(run => {
+    const date = new Date(run.createdAt);
+    const dateLabel = Number.isNaN(date.getTime()) ? 'Unknown date' : date.toLocaleString();
+    const sourceLabel = sourceNames[run.source] || 'Recovery';
+    const recoveredCount = run.items.filter(item => item.downloadable).length;
+    const files = run.items.map(item => `
+      <div class="history-file-row">
+        <div class="history-file-details">
+          <strong>${escapeHtml(item.fileName)}</strong>
+          <span>${escapeHtml(item.status)} · ${escapeHtml(String(item.confidence))}% confidence</span>
+        </div>
+        ${item.downloadable
+          ? `<button class="btn btn-secondary btn-xs" type="button" data-history-download data-run-id="${escapeHtml(run.id)}" data-item-id="${escapeHtml(item.id)}">Download</button>`
+          : '<span class="badge badge-p1">No valid download</span>'}
+      </div>`).join('');
+    const bundleButton = run.bundleId
+      ? `<button class="btn btn-primary btn-xs" type="button" data-history-bundle data-run-id="${escapeHtml(run.id)}">Download recovery bundle</button>`
+      : '';
+    return `
+      <article class="history-run">
+        <div class="history-run-header">
+          <div>
+            <strong>${escapeHtml(sourceLabel)}${run.sourceName ? ` · ${escapeHtml(run.sourceName)}` : ''}</strong>
+            <span>${escapeHtml(dateLabel)} · ${recoveredCount}/${run.items.length} downloadable</span>
+          </div>
+          ${bundleButton}
+        </div>
+        <div class="history-run-files">${files}</div>
+      </article>`;
+  }).join('');
+}
+
+async function downloadHistoryArtifact(run, itemId, isBundle = false) {
+  if (!itemId) {
+    showToast('No recovery download is available for this entry.', 'warning');
+    return;
+  }
+  const downloadRoutes = {
+    'file-repair': `/api/repair/download/${encodeURIComponent(itemId)}`,
+    'disk-image': `/api/forensics/download-carved/${encodeURIComponent(itemId)}`,
+    'ntfs-drive': `/api/deleted/download/${encodeURIComponent(itemId)}`,
+  };
+  const route = downloadRoutes[run.source];
+  if (!route) {
+    showToast('This recovery type does not have a download route.', 'error');
+    return;
+  }
+  try {
+    const response = await fetch(`${API_BASE_URL}${route}`);
+    if (!response.ok) throw new Error(`Download failed (${response.status}); the recovery server may have restarted.`);
+    const blob = await response.blob();
+    const url = URL.createObjectURL(blob);
+    const anchor = document.createElement('a');
+    anchor.href = url;
+    anchor.download = isBundle
+      ? 'recovery-bundle.zip'
+      : run.items.find(item => item.id === itemId)?.fileName || 'recovered-file';
+    document.body.appendChild(anchor);
+    anchor.click();
+    anchor.remove();
+    window.setTimeout(() => URL.revokeObjectURL(url), 1000);
+  } catch (error) {
+    console.error('Could not download a recovered file from history.', error);
+    showToast(error.message || 'Could not download this recovered file.', 'error');
+  }
 }
 
 // ==============================================================================
@@ -735,6 +936,7 @@ async function handleDiskImageIngested(file) {
       }));
       
       renderRestoredResults(formattedItems, true);
+      saveRecoveryHistory(formattedItems, 'disk-image', data.bundle_id, file.name);
       
       const bundleBtn = document.getElementById('btn-download-bundle');
       bundleBtn.onclick = () => {
@@ -901,6 +1103,7 @@ function renderDriveScanResults(data) {
   document.getElementById('btn-download-deleted-bundle').onclick = () => {
     window.location.href = `${API_BASE_URL}/api/deleted/download/${data.bundle_id}`;
   };
+  saveRecoveryHistory(data.items, 'ntfs-drive', data.bundle_id, data.source);
   showToast(`Recovered ${data.total_recovered} deleted file(s) from ${data.source}.`, 'success');
 }
 
@@ -956,6 +1159,7 @@ function initRecoveryHandler() {
       const data = await waitForRecoveryJob(jobId);
       if (data.status !== 'completed') throw new Error(data.error || 'Recovery job failed');
       renderRestoredResults(data.items, true, data.bundle_id);
+      saveRecoveryHistory(data.items, 'file-repair', data.bundle_id);
       repairedCount = data.items.filter(item => item.id && item.report?.status !== 'ORIGINAL_VALID').length;
       originalCount = data.items.filter(item => item.report?.status === 'ORIGINAL_VALID').length;
       backendSuccess = true;
